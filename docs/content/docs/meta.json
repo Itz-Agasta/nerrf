@@ -1,0 +1,76 @@
+{
+  "home": {
+    "title": "Home",
+    "url": "/"
+  },
+  "getting-started": {
+    "title": "Getting Started",
+    "children": [
+      {
+        "title": "Quick Overview",
+        "url": "/docs",
+        "icon": "🚀"
+      },
+      {
+        "title": "Quick Start (5 min)",
+        "url": "/docs/tracker/quick-start",
+        "icon": "⚡"
+      },
+      {
+        "title": "System Architecture",
+        "url": "/docs/architecture",
+        "icon": "🏗️"
+      }
+    ]
+  },
+  "tracker-component": {
+    "title": "Tracker Component",
+    "children": [
+      {
+        "title": "Overview & Design",
+        "url": "/docs/tracker/overview",
+        "icon": "📡"
+      },
+      {
+        "title": "Implementation Deep Dive",
+        "url": "/docs/tracker/implementation",
+        "icon": "🔬"
+      },
+      {
+        "title": "Quick Start Guide",
+        "url": "/docs/tracker/quick-start",
+        "icon": "🚀"
+      }
+    ]
+  },
+  "threat-detection": {
+    "title": "Threat & Detection",
+    "children": [
+      {
+        "title": "Threat Model",
+        "url": "/docs/threat-model",
+        "icon": "🎯"
+      },
+      {
+        "title": "System Architecture",
+        "url": "/docs/architecture",
+        "icon": "🏗️"
+      }
+    ]
+  },
+  "development": {
+    "title": "Development",
+    "children": [
+      {
+        "title": "Contributing Guide",
+        "url": "/docs/contributing",
+        "icon": "🛠️"
+      },
+      {
+        "title": "Roadmap",
+        "url": "/docs/architecture#development-phases",
+        "icon": "🗺️"
+      }
+    ]
+  }
+}

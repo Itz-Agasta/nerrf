@@ -1,0 +1,482 @@
+---
+title: Contributing Guide
+description: How to contribute to NERRF development
+---
+
+## Welcome Contributors! 👋
+
+NERRF is an open-source project actively seeking contributions. Whether you're a security researcher, kernel engineer, ML enthusiast, or DevOps engineer, there's a place for you.
+
+---
+
+## Code of Conduct
+
+We are committed to providing a welcoming and inclusive environment. Please read our [Code of Conduct](https://github.com/Itz-Agasta/nerrf/blob/main/CODE_OF_CONDUCT.md) before participating.
+
+---
+
+## Getting Started
+
+### 1. Fork & Clone
+
+```bash
+git clone https://github.com/YOUR_USERNAME/neerf.git
+cd nerrf
+git remote add upstream https://github.com/Itz-Agasta/neerf.git
+```
+
+### 2. Set Up Development Environment
+
+```bash
+# Install dependencies
+cd tracker && bash scripts/install-deps.sh
+
+# Build locally
+make tracker
+
+# Run tests
+make test
+```
+
+### 3. Create a Feature Branch
+
+```bash
+git checkout -b feature/my-feature
+```
+
+---
+
+## Contribution Types
+
+### Bug Reports
+
+**Found a bug?**
+
+1. Check existing issues: [existing issues](https://github.com/Itz-Agasta/nerrf/issues)
+2. Create a new issue with:
+- Clear title and description
+- Steps to reproduce
+- Expected vs. actual behavior
+- Environment (OS, kernel version, Go version)
+- Tracker logs (if applicable)
+
+**Example:**
+
+```
+Title: Tracker crashes on kernel 5.4 with eBPF ring buffer
+
+Description:
+When running the tracker on Ubuntu 20.04 (kernel 5.4),
+the tracker panics with "ringbuf read error: operation not supported"
+
+Steps:
+1. uname -r  # 5.4.0-42-generic
+2. make tracker
+3. sudo ./bin/tracker
+4. Observe panic
+
+Expected: Tracker attaches and streams events
+Actual: Crashes immediately
+```
+
+### Feature Requests
+
+**Want a new feature?**
+
+1. Open a discussion: [Discussions](https://github.com/Itz-Agasta/nerrf/discussions)
+2. For concrete proposals, open an issue with:
+
+- Feature description
+- Use case / motivation
+- Proposed implementation approach
+- Estimated effort (small/medium/large)
+
+### Documentation
+
+**Improve docs?**
+
+- Fix typos, add examples, clarify concepts
+- Update diagrams or architecture docs
+- Add troubleshooting sections
+- Create new guides for common scenarios
+
+**No PR needed for minor fixes!** Just point them out in an issue.
+
+### Code Contributions
+
+**Ready to code?**
+
+1. **Small fixes** (typos, comments): Direct PR
+2. **Medium features** (new syscall, new metric): Discuss in issue first
+3. **Large features** (new detection model, new sandbox): Open a discussion + RFC
+
+---
+
+## Development Workflow
+
+### Tracker Component Example
+
+**Goal:** Add support for the `chmod` syscall
+
+#### Step 1: Plan
+
+Open issue: "Feature: Add chmod syscall instrumentation"
+
+```
+Description:
+Add capability to detect permission changes on files,
+useful for detecting ransomware disabling security tools.
+
+Implementation:
+1. Add tracepoint in tracepoints.c: sys_enter_fchmod + sys_enter_chmod
+2. Update event struct with new/old permissions
+3. Add syscall ID mapping in main.go
+4. Update protobuf schema (trace.proto)
+5. Regenerate gRPC stubs
+6. Add unit tests for permission parsing
+7. Update docs/tracker/overview.md
+```
+
+#### Step 2: Branch
+
+```bash
+git checkout -b feat/chmod-syscall
+```
+
+#### Step 3: Implement eBPF
+
+Edit `tracker/bpf/tracepoints.c`:
+
+```c
+SEC("tracepoint/syscalls/sys_enter_chmod")
+int trace_chmod(struct trace_event_raw_sys_enter *ctx) {
+    struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+    if (!e) return 0;
+
+    fill_common(e, ctx);
+    e->syscall_id = 4;  // New ID for chmod
+
+    const char *pathname = (const char *)ctx->args[0];
+    bpf_probe_read_user_str(&e->path, sizeof(e->path), pathname);
+
+    // Extract mode argument
+    e->mode = ctx->args[1];  // Second argument is mode
+
+    bpf_ringbuf_submit(e, 0);
+    return 0;
+}
+```
+
+#### Step 4: Update Protobuf
+
+Edit `proto/trace.proto`:
+
+```protobuf
+message Event {
+  // ... existing fields ...
+  uint32 mode = 11;  // New field for chmod
+}
+```
+
+#### Step 5: Regenerate Stubs
+
+```bash
+make protoc  # Regenerates trace.pb.go, trace_grpc.pb.go
+```
+
+#### Step 6: Update Userspace
+
+Edit `tracker/cmd/tracker/main.go`:
+
+```go
+func syscallName(id uint32) string {
+    switch id {
+    case 1:
+        return "openat"
+    case 2:
+        return "write"
+    case 3:
+        return "rename"
+    case 4:
+        return "chmod"  // NEW
+    default:
+        return "unknown"
+    }
+}
+
+// Also update event struct if needed:
+type event struct {
+    // ... existing fields ...
+    Mode uint32  // New field
+}
+```
+
+#### Step 7: Test
+
+```bash
+# Build
+make tracker
+
+# Manual test
+sudo ./bin/tracker &
+chmod 000 /tmp/testfile  # Generate chmod syscall
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents | grep chmod
+
+# Stop tracker
+pkill tracker
+```
+
+#### Step 8: Add Tests
+
+Create `tracker/cmd/tracker/main_test.go`:
+
+```go
+func TestSyscallName(t *testing.T) {
+    tests := []struct{
+        id       uint32
+        expected string
+    }{
+        {1, "openat"},
+        {2, "write"},
+        {3, "rename"},
+        {4, "chmod"},  // NEW
+    }
+
+    for _, tt := range tests {
+        result := syscallName(tt.id)
+        if result != tt.expected {
+            t.Errorf("syscallName(%d) = %s, want %s", tt.id, result, tt.expected)
+        }
+    }
+}
+```
+
+#### Step 9: Document
+
+Update `docs/content/docs/tracker/overview.mdx`:
+
+```markdown
+| Syscall | ID | Purpose                          |
+| ------- | -- | -------------------------------- |
+| openat  | 1  | File open/create                 |
+| write   | 2  | File write                       |
+| rename  | 3  | File rename                      |
+| chmod   | 4  | Permission changes               |  ← NEW
+```
+
+#### Step 10: Commit
+
+```bash
+git add tracker/bpf/tracepoints.c proto/trace.proto \
+         tracker/cmd/tracker/main.go tracker/cmd/tracker/main_test.go \
+         docs/content/docs/tracker/overview.mdx
+
+git commit -m "feat: add chmod syscall instrumentation
+
+- Add sys_enter_chmod tracepoint (ID 4)
+- Extract mode parameter from syscall args
+- Update protobuf schema with mode field
+- Add syscall name mapping
+- Include unit tests
+- Update Tracker documentation"
+```
+
+#### Step 11: Push & Create PR
+
+```bash
+git push origin feat/chmod-syscall
+```
+
+Then open PR on GitHub with title and description referencing the issue.
+
+---
+
+## Code Style Guidelines
+
+### Go Code
+
+```go
+// Use short, meaningful variable names
+func processEvent(e *event) {
+    pid := e.Pid      // OK
+    p := e.Pid        // OK (loop counter)
+    processIdentifier := e.Pid  // Too verbose
+}
+
+// Comment exported functions
+// processEvent handles eBPF event conversion
+func processEvent(e *event) error { ... }
+
+// Keep functions small (<50 lines)
+// If >50 lines, consider breaking into helpers
+
+// Use standard library when possible
+// Avoid external dependencies unless necessary
+```
+
+### eBPF Code
+
+```c
+// Inline comments for complex logic
+static __always_inline void fill_common(struct event *e, struct pt_regs *ctx) {
+    e->ts = bpf_ktime_get_ns();  // Kernel monotonic time
+    e->pid = bpf_get_current_pid_tgid() >> 32;  // Extract PID from tgid
+}
+
+// Avoid unnecessary memory allocations
+// All eBPF variables must be stack-allocated
+
+// Always validate reservations
+struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
+if (!e) return 0;  // Essential error check
+```
+
+### Protobuf
+
+```protobuf
+// Use clear, descriptive field names
+message Event {
+  google.protobuf.Timestamp ts = 1;    // Good
+  uint32 pid = 2;                      // Good
+  string reserved_field_1 = 3;         // Don't do this
+}
+
+// Reserve field numbers for future use
+reserved 10 to 20;  // Reserved for future expansion
+```
+
+---
+
+## Testing Requirements
+
+### Minimum Coverage
+
+- **Tracker changes:** ≥80% code coverage
+- **eBPF changes:** Unit tests + integration tests
+- **Protobuf changes:** Forward/backward compatibility tests
+
+### Running Tests
+
+```bash
+# Unit tests
+make test
+
+# Coverage report
+make coverage
+
+# Integration tests (requires root + eBPF)
+make e2e
+
+# Load tests
+make bench
+```
+
+### Example Test
+
+```go
+func TestSanitizeString(t *testing.T) {
+    tests := []struct {
+        input    []byte
+        expected string
+        desc     string
+    }{
+        {
+            input:    []byte("/etc/passwd\x00\x00\x00\x00"),
+            expected: "/etc/passwd",
+            desc:     "null-terminated string",
+        },
+        {
+            input:    []byte("valid-utf8\x00"),
+            expected: "valid-utf8",
+            desc:     "valid UTF-8",
+        },
+        {
+            input:    []byte("invalid\xff\xfe\x00"),
+            expected: "invalid??",
+            desc:     "invalid UTF-8 replaced",
+        },
+    }
+
+    for _, tt := range tests {
+        result := sanitizeString(tt.input)
+        if result != tt.expected {
+            t.Errorf("%s: got %q, want %q", tt.desc, result, tt.expected)
+        }
+    }
+}
+```
+
+---
+
+## Commit Message Guidelines
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+
+- `feat` – New feature
+- `fix` – Bug fix
+- `docs` – Documentation
+- `style` – Formatting, missing semicolons, etc.
+- `refactor` – Code cleanup without functionality change
+- `perf` – Performance improvement
+- `test` – Adding/updating tests
+- `chore` – Build, CI, dependency updates
+
+**Example:**
+
+```
+feat(tracker): add chmod syscall support
+
+- Instrument sys_enter_chmod and sys_enter_fchmod tracepoints
+- Extract permission bits from syscall arguments
+- Update event protobuf schema with mode field
+- Add 10 new unit tests with 95% coverage
+
+Fixes #123
+```
+
+---
+
+
+## Documentation Standards
+
+### For Code Changes
+
+Every significant code change should include:
+
+- **Comment block** (if exported)
+- **Inline comments** (for non-obvious logic)
+- **Unit tests** (with test documentation)
+- **CHANGELOG entry** (if user-facing)
+
+### For New Features
+
+Create/update docs in `docs/content/docs/`:
+
+```
+docs/content/docs/
+├── tracker/
+│   ├── overview.mdx        (← Add feature to capabilities table)
+│   ├── implementation.mdx   (← Add implementation details)
+│   └── quick-start.mdx      (← Add usage example)
+├── architecture.mdx         (← Update system diagram if relevant)
+└── threat-model.mdx         (← Update detection section if relevant)
+```
+
+---
+
+## Questions?
+
+- Discussions: [Discussions](https://github.com/Itz-Agasta/nerrf/discussions)
+- Email: [rupam.golui@proton.me](mailto:rupam.golui@proton.me)
+- Twitter: [@neerf_ai](https://twitter.com/idkAgasta)
+- Documentation: You're reading it!

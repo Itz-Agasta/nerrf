@@ -1,13 +1,81 @@
 ---
-title: Hello World
-description: Your first document
+title: NERRF Documentation
+description: Neural Execution Reversal & Recovery Framework - AI-driven ransomware recovery
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+![banner](/neerf_banner.png)
 
-## What is Next?
+## Welcome to NERRF
+NERRF is an open-source project exploring AI-driven "undo computing" for post-zero-trust cloud and IoT environments. This MVP implements a fine-grained rollback system using eBPF instrumentation, Graph Neural Networks (GNN), Long Short-Term Memory (LSTM) models, and Monte-Carlo Tree Search (MCTS) to reverse ransomware attacks (e.g., LockBit-style) on Kubernetes clusters. Aimed at reducing Mean Time to Recovery (MTTR) < 60 min and data loss < 128 MB, NERRF targets security researchers, cloud engineers, and AI practitioners. it offers a scalable, reproducible framework with Helm deployment and synthetic datasets!!
+
+
+## Getting Started
+
+###  I Want to Deploy It
+
+Start with the **[Tracker Quick Start](./tracker/quick-start)** to get eBPF tracing running in 5 minutes.
+
+```bash
+cd tracker && make tracker && sudo ./bin/tracker
+```
+
+### I Want to Understand It
+
+Read **[System Architecture](./architecture)** for a complete overview of components and threat model.
+
+### I Want to Contribute
+
+Check **[Implementation Guide](./tracker/implementation)** for deep dives into kernel code and design patterns.
+
+### I Want to Test the Attack
+
+Follow **[Threat Model & LockBit Scenario](./threat-model)** to run ransomware simulations on your cluster.
+
+---
+
+## Key Sections
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card 
+    title="Architecture" 
+    description="System design, threat model, and component responsibilities"
+    href="./architecture" 
+  />
+  <Card 
+    title="Tracker Component" 
+    description="Real-time eBPF-based syscall capture (M1  Complete)"
+    href="./tracker/overview" 
+  />
+  <Card 
+    title="Tracker Quick Start" 
+    description="Deploy and run in 5 minutes"
+    href="./tracker/quick-start" 
+  />
+  <Card 
+    title="Implementation Deep Dive" 
+    description="Kernel code, design patterns, performance tuning"
+    href="./tracker/implementation" 
+  />
+  <Card 
+    title="Threat Model" 
+    description="LockBit-3.0 attack phases and detection strategy"
+    href="./threat-model" 
+  />
+  <Card 
+    title="Contributing" 
+    description="How to contribute to NERRF"
+    href="./contributing" 
+  />
 </Cards>
+
+---
+
+## Acknowledgments
+
+This project was inspired by:
+- **DTrace/SystemTap** (runtime tracing pioneering)
+- **Falco** (eBPF-based threat detection)
+- **AlphaGo** (Monte-Carlo tree search for planning)
+- **Reversible VM Execution** research (undo computing concepts)
+
+**Special thanks to my advisors and contributors!**

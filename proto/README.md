@@ -20,6 +20,28 @@ chmod +x compile_test.sh && compile_test.sh
 
 or, Run `protoc --go_out=. proto/trace.proto` to test. No errors means success.
 
+## Example
+
+```json
+{
+  "ts": "2025-11-02T12:35:01.123Z",
+  "pid": 1234,
+  "tid": 1234,
+  "comm": "python3",
+  "syscall": "write",
+  "path": "/home/user/data.txt",
+  "new_path": "",
+  "flags": "O_WRONLY",
+  "ret_val": 12,
+  "bytes": 12,
+  "inode": "123456789",
+  "mode": 420,
+  "uid": 1000,
+  "gid": 1000,
+  "dependencies": ["input.txt"]
+}
+```
+
 ## Future Extensions
 
 - Add Timestamp for absolute time (M2 AI integration).

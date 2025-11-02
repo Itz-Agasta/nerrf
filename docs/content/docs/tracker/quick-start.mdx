@@ -1,0 +1,381 @@
+---
+title: Tracker Quick Start
+description: Get the tracker running in 5 minutes
+---
+
+## Prerequisites
+
+- **Linux kernel 4.18+** (check with `uname -r`)
+- **Root privileges** (for eBPF)
+- **Go 1.21+**
+- **libbpf** development headers
+- **clang/LLVM 10+** (for eBPF compilation)
+
+---
+
+## Installation (1 minute)
+
+### Automated Setup
+
+```bash
+cd tracker
+bash scripts/install-deps.sh
+```
+
+This script handles:
+- Package manager detection (apt/yum)
+- Dependency installation
+- Go module vendor setup
+
+### Manual Setup
+
+#### Ubuntu/Debian
+
+```bash
+sudo apt update
+sudo apt install -y \
+  clang \
+  llvm \
+  libelf-dev \
+  libpcap-dev \
+  gcc \
+  make \
+  golang-go
+```
+
+#### CentOS/RHEL
+
+```bash
+sudo dnf install -y \
+  clang \
+  llvm-devel \
+  elfutils-libelf-devel \
+  libpcap-devel \
+  gcc \
+  make \
+  golang
+```
+
+---
+
+## Build (1 minute)
+
+```bash
+cd tracker
+
+# Build eBPF object and Go binary
+make tracker
+
+# Verify build
+ls -lah bin/tracker
+# Output: -rwxr-xr-x tracker (5-10 MB)
+```
+
+### Build Steps Explained
+
+```bash
+# Step 1: Compile eBPF program to bytecode
+clang -O2 -target bpf -c ./bpf/tracepoints.c -o ./bpf/tracepoints.o
+
+# Step 2: Embed eBPF object in Go binary
+CGO_ENABLED=1 go build -o ./bin/tracker ./cmd/tracker/main.go
+```
+
+---
+
+## Run (1 minute)
+
+### Start the Tracker
+
+```bash
+sudo ./bin/tracker
+```
+
+**Expected output:**
+```
+2025/01/15 10:30:45 Tracker listening on 127.0.0.1:50051
+```
+
+The tracker is now:
+-  Attached to kernel syscall tracepoints
+-  Reading eBPF ring buffer
+-  Listening for gRPC connections on port 50051
+
+### Test Connection (in another terminal)
+
+```bash
+# Query events via gRPC
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
+```
+
+**Expected output (streaming):**
+```json
+{
+  "events": [
+    {
+      "ts": "2025-01-15T10:30:46.123456789Z",
+      "pid": 1234,
+      "tid": 1234,
+      "comm": "bash",
+      "syscall": "openat",
+      "path": "/etc/passwd",
+      "retVal": 3,
+      "flags": "O_RDONLY"
+    },
+    {
+      "ts": "2025-01-15T10:30:46.125789012Z",
+      "pid": 1234,
+      "tid": 1234,
+      "comm": "bash",
+      "syscall": "read",
+      "bytes": 2048,
+      "retVal": 2048
+    }
+  ]
+}
+```
+
+Press `Ctrl+C` to stop streaming.
+
+---
+
+## Docker Build (optional)
+
+### Build Container Image
+
+```bash
+docker build -f tracker/Dockerfile.minimal -t nerrf/tracker:m1 .
+```
+
+### Run in Docker
+
+```bash
+# Must use privileged mode for eBPF
+docker run --privileged --network host \
+  -e TRACKER_LISTEN_ADDR=0.0.0.0:50051 \
+  nerrf/tracker:m1
+```
+
+**Connect from host:**
+```bash
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
+```
+
+---
+
+## Kubernetes Deployment (optional)
+
+### Deploy DaemonSet
+
+```bash
+# 1. Load image into kind/minikube cluster
+kind load docker-image nerrf/tracker:m1
+
+# 2. Create namespace
+kubectl create namespace nerrf
+
+# 3. Deploy
+cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tracker
+  namespace: nerrf
+spec:
+  selector:
+    matchLabels:
+      app: tracker
+  template:
+    metadata:
+      labels:
+        app: tracker
+    spec:
+      hostNetwork: true
+      containers:
+        - name: tracker
+          image: nerrf/tracker:m1
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: TRACKER_LISTEN_ADDR
+              value: "0.0.0.0:50051"
+          ports:
+            - containerPort: 50051
+              protocol: TCP
+            - name: grpc
+              containerPort: 50051
+EOF
+
+# 4. Verify running
+kubectl logs -n nerrf -f ds/tracker
+```
+
+### Query from Host
+
+```bash
+# Port-forward to tracker pod
+kubectl port-forward -n nerrf ds/tracker 50051:50051 &
+
+# Query events
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
+```
+
+---
+
+## Common Commands
+
+### Generate Test Workload
+
+```bash
+# In separate terminal, create file syscalls
+dd if=/dev/zero of=/tmp/test.img bs=1M count=10 && rm /tmp/test.img
+
+# Observe tracker output:
+# - openat for /tmp/test.img
+# - write events (bytes written)
+# - close
+```
+
+### Monitor Throughput
+
+```bash
+# Count events per second
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents \
+  | jq -s 'length / (now - (.[0].ts | fromdateiso8601))'
+```
+
+### Check System Stats
+
+```bash
+# CPU usage of tracker process
+ps aux | grep tracker | grep -v grep | awk '{print $3, $4, $11}'
+
+# Memory usage
+ps aux | grep tracker | grep -v grep | awk '{print $6}'  # In KB
+
+# Network connections
+ss -tlnp | grep 50051
+```
+
+### Graceful Shutdown
+
+```bash
+# Press Ctrl+C in tracker terminal, or:
+pkill -SIGTERM tracker
+
+# Expected:
+# gRPC server stopped
+```
+
+---
+
+## Troubleshooting
+
+### Issue: "Permission denied"
+
+**Cause:** Not running as root
+
+**Fix:**
+```bash
+sudo ./bin/tracker
+```
+
+Or grant capabilities:
+```bash
+sudo setcap cap_sys_admin=ep ./bin/tracker
+./bin/tracker  # Now runs without sudo
+```
+
+### Issue: "BPF object not found"
+
+**Cause:** Build incomplete
+
+**Fix:**
+```bash
+make clean
+make tracker
+ls bpf/tracepoints.o  # Should exist
+```
+
+### Issue: "can't bind address"
+
+**Cause:** Port 50051 already in use
+
+**Fix:**
+```bash
+# Check what's using port
+sudo lsof -i :50051
+
+# Use different port
+export TRACKER_LISTEN_ADDR=127.0.0.1:50052
+./tracker
+
+# Connect to new port
+grpcurl -plaintext -d '{}' localhost:50052 nerrf.trace.Tracker/StreamEvents
+```
+
+### Issue: "ringbuf read error: resource temporarily unavailable"
+
+**Cause:** No syscalls occurring (normal!)
+
+**Fix:** Generate syscalls in another terminal:
+```bash
+touch /tmp/test.txt
+cat /tmp/test.txt
+ls -la /tmp/
+```
+
+### Issue: No events in gRPC stream
+
+**Cause:** Tracker attached but query missing events
+
+**Debug:**
+```bash
+# 1. Verify tracker is running
+ps aux | grep tracker | grep -v grep
+
+# 2. Check eBPF programs attached
+sudo bpftool prog list
+
+# 3. Check ring buffer map exists
+sudo bpftool map list | grep events
+
+# 4. Generate clear syscalls
+strace -e openat ls /tmp 2>/dev/null
+
+# 5. Query again
+grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
+```
+
+---
+
+## Next Steps
+
+-  **[Architecture](../overview)** – Deep dive into design
+-  **[Implementation Guide](../implementation)** – Kernel & userspace details
+-  **[Debugging](../overview#troubleshooting)** – Advanced troubleshooting
+-  **[Contributing](../../contributing)** – Add new features
+
+---
+
+## Performance Expectations
+
+On a modern 4-core VM:
+
+| Workload               | Throughput | CPU  | Latency |
+| ---------------------- | ---------- | ---- | ------- |
+| **Light (office work)** | 50-100 evt/s | &lt;1% | &lt;1 ms   |
+| **Medium (web server)** | 500-1k evt/s | 2-3% | 1-5 ms  |
+| **Heavy (I/O stress)**  | 1k-2k evt/s | 3-5% | 5-50 ms |
+
+Peak capacity is around 2-3k events/second before CPU saturation.
+
+---
+
+## Getting Help
+
+-  Check [Architecture](../overview) for concepts
+-  Review [Implementation](../implementation) for code details
+-  Open issue on GitHub: [github.com/Itz-Agasta/neerf/issues](https://github.com/Itz-Agasta/neerf/issues)
+-  Ask in Discussions for usage questions
