@@ -1,8 +1,8 @@
 #!/bin/bash
-# NEERF Tracker - Public Dependency Installation Script
+# NERRF Tracker - Public Dependency Installation Script
 # Milestone: M1 - Tracker Alpha
 # 
-# This script installs all dependencies required to build and run the NEERF Tracker
+# This script installs all dependencies required to build and run the NERRF Tracker
 # on Ubuntu/Debian and RHEL/CentOS systems.
 #
 # Requirements:
@@ -11,9 +11,9 @@
 #   - Linux kernel 4.18+ with eBPF support
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/Itz-Agasta/neerf/m1/scripts/install-deps.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/Itz-Agasta/nerrf/m1/scripts/install-deps.sh | bash
 #   # OR
-#   wget -O- https://raw.githubusercontent.com/Itz-Agasta/neerf/m1/scripts/install-deps.sh | bash
+#   wget -O- https://raw.githubusercontent.com/Itz-Agasta/nerrf/m1/scripts/install-deps.sh | bash
 
 set -euo pipefail
 
@@ -329,7 +329,7 @@ install_go_tools() {
 main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║               NEERF Tracker Dependency Installer             ║"
+    echo "║               NERRF Tracker Dependency Installer             ║"
     echo "║                     M1 - Tracker Alpha                       ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -361,8 +361,8 @@ main() {
     echo "║                                                              ║"
     echo "║  Next steps:                                                 ║"
     echo "║  1. Restart your shell or run: source ~/.bashrc             ║"
-    echo "║  2. Clone NEERF: git clone https://github.com/Itz-Agasta/neerf ║"
-    echo "║  3. Build tracker: cd neerf/tracker && make all             ║"
+    echo "║  2. Clone NERRF: git clone https://github.com/Itz-Agasta/nerrf ║"
+    echo "║  3. Build tracker: cd nerrf/tracker && make all             ║"
     echo "║  4. Run as root: sudo ./bin/tracker                         ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"

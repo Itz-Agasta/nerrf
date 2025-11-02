@@ -111,27 +111,27 @@ grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
 **Expected output (streaming):**
 ```json
 {
-  "events": [
-    {
-      "ts": "2025-01-15T10:30:46.123456789Z",
-      "pid": 1234,
-      "tid": 1234,
-      "comm": "bash",
-      "syscall": "openat",
-      "path": "/etc/passwd",
-      "retVal": 3,
-      "flags": "O_RDONLY"
-    },
-    {
-      "ts": "2025-01-15T10:30:46.125789012Z",
-      "pid": 1234,
-      "tid": 1234,
-      "comm": "bash",
-      "syscall": "read",
-      "bytes": 2048,
-      "retVal": 2048
-    }
-  ]
+    "events": [
+        {
+            "ts": "2025-01-15T10:30:46.123456789Z",
+            "pid": 1234,
+            "tid": 1234,
+            "comm": "bash",
+            "syscall": "openat",
+            "path": "/etc/passwd",
+            "retVal": 3,
+            "flags": "O_RDONLY"
+        },
+        {
+            "ts": "2025-01-15T10:30:46.125789012Z",
+            "pid": 1234,
+            "tid": 1234,
+            "comm": "bash",
+            "syscall": "read",
+            "bytes": 2048,
+            "retVal": 2048
+        }
+    ]
 }
 ```
 
@@ -363,11 +363,11 @@ grpcurl -plaintext -d '{}' localhost:50051 nerrf.trace.Tracker/StreamEvents
 
 On a modern 4-core VM:
 
-| Workload               | Throughput | CPU  | Latency |
-| ---------------------- | ---------- | ---- | ------- |
-| **Light (office work)** | 50-100 evt/s | &lt;1% | &lt;1 ms   |
-| **Medium (web server)** | 500-1k evt/s | 2-3% | 1-5 ms  |
-| **Heavy (I/O stress)**  | 1k-2k evt/s | 3-5% | 5-50 ms |
+| Workload                | Throughput   | CPU    | Latency  |
+| ----------------------- | ------------ | ------ | -------- |
+| **Light (office work)** | 50-100 evt/s | &lt;1% | &lt;1 ms |
+| **Medium (web server)** | 500-1k evt/s | 2-3%   | 1-5 ms   |
+| **Heavy (I/O stress)**  | 1k-2k evt/s  | 3-5%   | 5-50 ms  |
 
 Peak capacity is around 2-3k events/second before CPU saturation.
 
@@ -377,5 +377,5 @@ Peak capacity is around 2-3k events/second before CPU saturation.
 
 -  Check [Architecture](../overview) for concepts
 -  Review [Implementation](../implementation) for code details
--  Open issue on GitHub: [github.com/Itz-Agasta/neerf/issues](https://github.com/Itz-Agasta/neerf/issues)
+-  Open issue on GitHub: [github.com/Itz-Agasta/nerrf/issues](https://github.com/Itz-Agasta/nerrf/issues)
 -  Ask in Discussions for usage questions

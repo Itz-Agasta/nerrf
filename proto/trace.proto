@@ -1,7 +1,7 @@
 syntax = "proto3";
 package nerrf.trace;
 
-option go_package = "github.com/Itz-Agasta/neerf/tracker/pkg/pb;pb";
+option go_package = "github.com/Itz-Agasta/nerrf/tracker/pkg/pb;pb";
 
 
 import "google/protobuf/timestamp.proto";

@@ -1,4 +1,4 @@
-module github.com/Itz-Agasta/neerf/tracker
+module github.com/Itz-Agasta/nerrf/tracker
 
 go 1.23.0
 

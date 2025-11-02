@@ -1,6 +1,6 @@
 # LockBit-style Ransomware Simulation for NERRF
 
-This document outlines controlled LockBit-style ransomware simulations for NEERF M0 (Research Lock-in) and M1 (Tracker Alpha) milestones. The goal is to define realistic file-level syscalls and encryption behavior within Kubernetes pods to validate the dependency graph and undo planner.
+This document outlines controlled LockBit-style ransomware simulations for NERRF M0 (Research Lock-in) and M1 (Tracker Alpha) milestones. The goal is to define realistic file-level syscalls and encryption behavior within Kubernetes pods to validate the dependency graph and undo planner.
 
 ## About LockBit
 

@@ -35,10 +35,10 @@ echo "📦 2.  Load tracker image into minikube"
 minikube image load "$IMAGE"
 
 echo "📄 2.5. Create ConfigMap for simulation script"
-kubectl create configmap lockbit-simulator --from-file=sim_lockbit.py=/home/agasta/res/neerf/benchmarks/m0/scripts/sim_lockbit.py --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap lockbit-simulator --from-file=sim_lockbit.py=/home/agasta/res/nerrf/benchmarks/m0/scripts/sim_lockbit.py --dry-run=client -o yaml | kubectl apply -f -
 
 echo "🚀 3.  Deploy tracker pod"
-kubectl apply -f /home/agasta/res/neerf/benchmarks/m0/manifests/tracker-pod.yaml
+kubectl apply -f /home/agasta/res/nerrf/benchmarks/m0/manifests/tracker-pod.yaml
 kubectl wait --for=condition=Ready pod/nerrf-tracker --timeout=60s
 
 echo "⏳ 4.  Wait for gRPC ready"
@@ -68,7 +68,7 @@ if ! grpcurl -plaintext $MINIKUBE_IP:50051 list >/dev/null 2>&1; then
 fi
 
 echo "📊 5.  Inject LockBit sim"
-kubectl apply -f /home/agasta/res/neerf/benchmarks/m0/manifests/m0_victim.yaml
+kubectl apply -f /home/agasta/res/nerrf/benchmarks/m0/manifests/m0_victim.yaml
 kubectl wait --for=condition=Ready pod/$POD --timeout=60s
 
 echo "🔍 6.  Capture 10 s of events"

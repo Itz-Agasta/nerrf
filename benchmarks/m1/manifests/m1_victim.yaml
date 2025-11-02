@@ -4,7 +4,7 @@ metadata:
   name: m1-victim
   namespace: default
   labels:
-    app: neerf-benchmark
+    app: nerrf-benchmark
     component: victim
     scale: enterprise
 spec:

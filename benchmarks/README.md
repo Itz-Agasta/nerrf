@@ -1,6 +1,6 @@
-# NEERF Benchmarks
+# NERRF Benchmarks
 
-This directory contains organized benchmarks for validating NEERF's ransomware recovery capabilities.
+This directory contains organized benchmarks for validating NERRF's ransomware recovery capabilities.
 
 ## Structure
 
@@ -32,7 +32,7 @@ cd benchmarks/m1/scripts
 ./m1_minikube_bootstrap.sh
 ```
 
-## Integration with NEERF Components
+## Integration with NERRF Components
 
 - **eBPF Tracker**: Use trace patterns from `*_trace.jsonl`
 - **GNN Training**: File paths and metadata become graph nodes

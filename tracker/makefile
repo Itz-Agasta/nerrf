@@ -46,7 +46,7 @@ test-full: bpf tracker
 # Install dependencies (requires root)
 install-deps:
 	@echo "📦 Installing dependencies..."
-	curl -sSL https://raw.githubusercontent.com/Itz-Agasta/neerf/tracker/scripts/install-deps.sh | bash
+	curl -sSL https://raw.githubusercontent.com/Itz-Agasta/nerrf/tracker/scripts/install-deps.sh | bash
 
 clean:
 	rm -rf bin/ bpf/*.o test/benchmark_results.txt test/cpu_benchmark.txt
