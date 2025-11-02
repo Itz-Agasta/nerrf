@@ -1,0 +1,417 @@
+---
+title: Threat Model & LockBit Scenario
+description: Attack simulation details and detection strategy
+---
+
+## LockBit-3.0 Overview
+
+**LockBit** is a Ransomware-as-a-Service (RaaS) platform that has been the world's most prolific ransomware since 2022.
+
+### Key Statistics
+
+- **Active Since:** Mid-2019
+- **Market Share:** 44% of all ransomware incidents (2022-2023)
+- **Recorded Incidents (US, 2020-2023):** ~1,700 attacks
+- **Total Ransom Paid:** $91M+
+- **Attack Speed:** Complete encryption in &lt; 5 minutes
+
+### Attack Success Factors
+
+1. **Initial Access:** Vulnerable RDP, compromised VPN, phishing
+2. **Lateral Movement:** SMB shares, AD domain exploitation
+3. **Encryption Speed:** Partial file encryption (first KB only)
+4. **Obfuscation:** Anti-analysis, string decoding, VM detection
+5. **Exfiltration:** Parallel data theft before encryption
+
+---
+
+## NERRF M0-M1 Ethical Simulation
+
+For research purposes, NERRF implements a **deterministic, reversible** LockBit-3.0 simulator using:
+- Python (cross-platform)
+- Fernet encryption (AES-128, reversible with key)
+- Controllable timing and file patterns
+- No actual system damage (can undo instantly)
+
+### Simulation Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│  Ransomware Simulation Pod                  │
+│  (Kubernetes Pod, m0_victim or m1_victim)  │
+├─────────────────────────────────────────────┤
+│                                             │
+│  python3 sim_lockbit_m0.py                  │
+│  ├─ Phase 0: Seed (create 25 files)         │
+│  ├─ Phase 1: Recon (enumerate /proc)       │
+│  ├─ Phase 2: Execution (spawn encryptor)   │
+│  ├─ Phase 2.5: Key Gen (Fernet.generate)   │
+│  ├─ Phase 3: Encrypt Loop (open→read→enc)  │
+│  ├─ Phase 4: Ransom Note (README_LOCKBIT)  │
+│  └─ Phase 5: Idle (keep pod running)       │
+│                                             │
+│  Traces captured: /tmp/m0_trace.jsonl      │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+### Benchmark Datasets
+
+#### M0 (Basic Scale)
+
+Located at: `benchmarks/m0/`
+
+| Metric             | Value             |
+| ------------------ | ----------------- |
+| **Files**          | 25                |
+| **Total Size**     | ~13 MB            |
+| **Duration**       | ~120 sec          |
+| **Syscalls**       | ~8k events        |
+| **Target Runtime** | &lt;60 sec (MTTR) |
+
+**Attack Phases:**
+```yaml
+P0 - Seed (T+0-10s):
+  - Create 25 files in /app/uploads (0.5 MB each)
+  - write() calls: 25 × 1 MB = ~25M writes total
+  - Expected events: 50-100
+
+P1 - Recon (T+10-20s):
+  - enumerate_processes(): openat /proc/[*]/cmdline (100+ calls)
+  - enumerate_network(): openat /proc/net/tcp (10+ calls)
+  - Expected events: 200-300
+
+P2 - Execution (T+20-30s):
+  - Spawn encryption subprocess
+  - Import Fernet library (openat)
+  - Generate random key (write to /tmp)
+  - Expected events: 50-100
+
+P3 - Encrypt Loop (T+30-110s):
+  - Loop over 25 files:
+    * open(file, O_RDONLY)
+    * read(data)
+    * write(encrypted)
+    * rename(file → file.lockbit3)
+  - Repeat 25 times
+  - Expected events: ~5k (openat, write, rename)
+
+P4 - Ransom Note (T+110-115s):
+  - write("README_LOCKBIT.txt", ransom_message)
+  - Expected events: 10-20
+
+P5 - Idle (T+115-120s):
+  - sleep(5)
+  - Keep pod running for trace analysis
+```
+
+**Ground Truth CSV** (`m0_ground_truth.csv`):
+
+```csv
+timestamp,event_type,path,syscall_id,is_attack
+2025-01-15T10:30:00.123Z,write,/app/uploads/file_1.dat,write,false
+2025-01-15T10:30:01.456Z,openat,/proc/net/tcp,openat,true
+2025-01-15T10:30:02.789Z,write,/tmp/key,write,true
+2025-01-15T10:30:05.012Z,openat,/app/uploads/file_1.dat,openat,true
+2025-01-15T10:30:05.234Z,write,/app/uploads/file_1.dat,write,true
+2025-01-15T10:30:05.456Z,rename,/app/uploads/file_1.dat.lockbit3,rename,true
+...
+```
+
+#### M1 (Enterprise Scale)
+
+Located at: `benchmarks/m1/`
+
+| Metric             | Value              |
+| ------------------ | ------------------ |
+| **Files**          | 47                 |
+| **Total Size**     | ~110 MB            |
+| **Duration**       | ~180 sec           |
+| **Syscalls**       | ~25k events        |
+| **Target Runtime** | &lt;300 sec (MTTR) |
+
+**Differences from M0:**
+- 47 files (vs 25)
+- 2-5 MB per file (vs 0.5 MB)
+- More recon queries (deeper enumeration)
+- Longer encryption loop (~120 sec vs ~80 sec)
+
+---
+
+## Detection Strategy
+
+### Phase 1: Raw Event Capture
+
+```
+Event Stream from Tracker:
+time      pid     syscall  path                        comment
+10:30:00  4567    openat   /proc/net/tcp               ← Recon!
+10:30:05  4567    openat   /app/uploads/file_1.dat    ← Encrypt start
+10:30:05  4567    write    /dev/zero (0)              ← Write data
+10:30:06  4567    rename   /app/.../file_1.lockbit3   ← Extension change!
+```
+
+### Phase 2: Temporal Graph Construction
+
+```
+Nodes:
+├─ file: /app/uploads/file_1.dat
+│  ├─ read_count: 1
+│  ├─ write_count: 1
+│  ├─ rename_count: 1
+│  └─ rename_ext: ".lockbit3"
+├─ file: /proc/net/tcp
+│  ├─ read_count: 2
+│  └─ tag: system_reconnaissance
+└─ process: python3 [PID 4567]
+   ├─ wrote_files: [file_1, file_2, ...]
+   └─ renamed_files: [file_1, file_2, ...]
+
+Edges:
+├─ process→file: python3 opens /app/uploads/file_1.dat
+├─ file→file: /app/uploads/file_1.dat → /app/uploads/file_1.dat.lockbit3
+└─ process→syscall: python3 executes rename() syscall
+```
+
+### Phase 3: Anomaly Detection (GNN)
+
+```
+Feature Extraction (per node):
+├─ In-degree: 1 (written to by process)
+├─ Out-degree: 1 (renamed to .lockbit3)
+├─ Temporal delta: 1.2 sec (read→write→rename)
+├─ Byte count ratio: 1.0 (full file encrypted)
+└─ Extension pattern: LOCKBIT_PATTERN (0.95 confidence)
+
+GNN Classification:
+├─ Normal file edge: [0.05, 0.95]  (95% normal)
+└─ Attack file edge: [0.92, 0.08]  (92% attack!)
+```
+
+### Phase 4: Pattern Recognition (LSTM)
+
+```
+Sequence of events (rolling window):
+Event 1: openat(/app/uploads/file_1.dat, O_RDONLY)
+Event 2: write(buffer, 1048576 bytes)
+Event 3: rename(old→new) with .lockbit3 suffix
+
+LSTM output:
+├─ encrypt_probability: 0.98
+├─ ransomware_score: 0.95
+└─ confidence: VERY_HIGH
+```
+
+### Phase 5: Recovery Planning (MCTS)
+
+```
+Undo candidates:
+├─ Candidate 1: Reverse file_1.dat encryption
+│  ├─ cost: 1 (single file)
+│  ├─ confidence: 0.95
+│  └─ reward: +0.95
+├─ Candidate 2: Kill process python3
+│  ├─ cost: 10 (process termination side effects)
+│  ├─ confidence: 0.80
+│  └─ reward: -0.05
+└─ Candidate 3: Restore from backup
+   ├─ cost: 100 (data loss risk)
+   ├─ confidence: 1.0
+   └─ reward: +0.9
+
+Best action: Reverse encryption (highest reward/cost ratio)
+```
+
+---
+
+## Attack Indicators by Phase
+
+### Recon Phase (Low Confidence ⚠️)
+
+```
+Indicator                              Detection Method
+────────────────────────────────────────────────────
+Burst of /proc/* opens                 Process enumeration (openat)
+Random TCP connects (port scan)        Socket events (future)
+LDAP queries (AD enumeration)          Network telemetry (future)
+```
+
+**Challenge:** Legitimate sysadmin tools do these too (backup agents, monitoring)
+
+**Mitigation in M2/M3:**
+- Temporal context (followed by encryption = attack)
+- Process whitelist (known-safe tools)
+- Permission-level checks
+
+### Encryption Phase (Very High Confidence )
+
+```
+Indicator                              Detection Method
+────────────────────────────────────────────────────
+Extension pattern (.lockbit*)          Regex on rename syscall
+Write-to-rename ratio > 0.8            Event aggregation
+First-N-KB writes (partial encrypt)    Byte count analysis
+AES patterns in writes                 Content inspection (future)
+Large file shrinkage                   Stat comparison (future)
+```
+
+**Why confident?**
+- No legitimate app uses `.lockbit*` extensions
+- Encryption typically writes full files before rename
+- Pattern is specific to LockBit/ransomware (low FP rate)
+
+### Ransom Note Phase (Medium Confidence ⚠️)
+
+```
+Indicator                              Detection Method
+────────────────────────────────────────────────────
+write("README_*.txt", ransom msg)      File content scan (future)
+Contact info in ransom note            OCR/regex on file read
+Accessibility of ransom file           Permissions snapshot
+```
+
+---
+
+## Evaluation Metrics
+
+### Detection Metrics
+
+```python
+# Ground truth labels: attack=1, normal=0
+
+TP = True Positives (attack correctly identified)
+FP = False Positives (normal incorrectly flagged)
+TN = True Negatives (normal correctly identified)
+FN = False Negatives (attack missed)
+
+Precision = TP / (TP + FP)         # Minimize false alarms
+Recall    = TP / (TP + FN)         # Don't miss attacks
+ROC-AUC   = Area under curve       # Overall discriminative power
+
+M1 Target: ROC-AUC ≥ 0.90 (M2 AI Spike milestone)
+```
+
+### Recovery Metrics
+
+```python
+MTTR = Mean Time to Recovery
+  = time(attack_detected) - time(recovery_complete)
+  Target: ≤ 60 min
+
+DataLoss = Files permanently deleted / Total files
+  Target: ≤ 128 MB
+
+FalsePositiveUndoRate = Legitimate files accidentally rolled back / Total undos
+  Target: &lt; 5%
+```
+
+### Performance Metrics
+
+```python
+Throughput = Events processed / second
+  Target: ≥ 1k evt/sec (M1 achieved)
+
+Latency (P99) = 99th percentile event capture to gRPC frame
+  Target: &lt; 1 ms
+
+CPU Overhead = (CPU with tracker) / (CPU without) - 1
+  Target: &lt; 5%
+```
+
+---
+
+## Benchmark Artifacts
+
+### M0 Results
+
+Located at: `benchmarks/m0/results/`
+
+```
+m0_victim.yaml                  # Kubernetes Pod manifest
+file_list.txt                   # Files created during simulation
+m0_ground_truth.csv             # Label data (attack/normal)
+m0_recovery_results.json        # Undo operation outcomes
+m0_trace.jsonl                  # Raw event stream (one event per line)
+metadata.json                   # Benchmark config (file count, duration, etc.)
+```
+
+**Sample `m0_trace.jsonl`:**
+```json
+{"ts":"2025-01-15T10:30:00.123456789Z","pid":1234,"syscall":"openat","path":"/app/uploads","ret_val":3}
+{"ts":"2025-01-15T10:30:00.234567890Z","pid":1234,"syscall":"write","bytes":512000,"ret_val":512000}
+{"ts":"2025-01-15T10:30:00.345678901Z","pid":1234,"syscall":"rename","path":"/app/uploads/file_1.dat","new_path":"/app/uploads/file_1.dat.lockbit3","ret_val":0}
+...
+```
+
+### M1 Results
+
+Located at: `benchmarks/m1/results/`
+
+Same structure as M0, but:
+- 47 files instead of 25
+- ~110 MB instead of ~13 MB
+- ~25k events instead of ~8k events
+
+---
+
+## Running the Simulation
+
+### Local Setup (Minikube)
+
+```bash
+# 1. Start Minikube
+minikube start --cpus 4 --memory 4096
+
+# 2. Build tracker
+cd tracker && make tracker
+
+# 3. Deploy tracker DaemonSet
+kubectl apply -f manifests/tracker.yaml
+
+# 4. Deploy victim pod
+kubectl apply -f benchmarks/m0/manifests/m0_victim.yaml
+
+# 5. Stream events
+kubectl logs -n default -f &lt;tracker-pod-name> | jq '.'
+
+# 6. After 2 min, collect results
+kubectl cp m0-victim:/tmp/m0_trace.jsonl ./benchmarks/m0/results/
+```
+
+### Automated CI (GitHub Actions)
+
+See `.github/workflows/demo.yml`:
+```yaml
+- name: Run M0 Benchmark
+  run: |
+    kind create cluster
+    make tracker
+    kubectl apply -f benchmarks/m0/manifests/
+    sleep 120
+    kubectl logs ds/tracker > /tmp/events.log
+
+- name: Validate Results
+  run: |
+    # Check ≥8k events captured
+    # Check detection ROC-AUC ≥ 0.80 (baseline)
+    python3 validate_m0.py
+```
+
+---
+
+
+## References
+
+- **LockBit Analysis:**
+- [TrendMicro Technical Report](https://www.trendmicro.com/content/dam/trendmicro/global/en/research/24/b/lockbit-attempts-to-stay-afloat-with-a-new-version/)
+- [CISA Advisory AA23-075A](https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-075a)
+- [Mandiant Ransomware Report](https://www.mandiant.com/resources/blog/lockbit-ransomware-analysis)
+
+- **Ransomware Detection:**
+- "CryptoLock Detection" (IEEE S&P 2015)
+- "Ransomware Early Warning System" (NDSS 2016)
+
+- **Undo Computing:**
+- "Reversible VM Execution" (VMware, 2009)
+- "Time-Travel Debugging" (GDB record/replay)
+

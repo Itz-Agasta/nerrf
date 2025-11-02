@@ -1,0 +1,216 @@
+---
+title: Architecture & Design
+description: System-level overview of NEERF
+---
+
+## NERRF System Architecture
+
+### High-Level Data Flow
+
+![High Level Architecture](/highArch.png)
+
+## Component Responsibilities
+
+### 1. **Tracker**
+
+**Purpose:** Streaming syscall capture
+
+**Responsibilities:**
+- Attach eBPF tracepoints to kernel syscalls
+- Stream events via gRPC to downstream components
+- Maintain &lt;5% CPU overhead
+- Support 1k+ events/sec throughput
+
+**Key Metrics:**
+- **MTTR (Mean Time to Recovery):** &lt; 60 min
+- **False-positive undo rate:** &lt; 5%
+- **Data loss:** &lt; 128 MB
+
+**Deployment:** Kubernetes DaemonSet (one per node)
+
+
+### 2. **Graph Constructor**
+
+**Purpose:** Build temporal dependency graph
+
+**Input:** Event stream from Tracker
+**Output:** Time-windowed graph (Nodes: processes, files; Edges: dependencies)
+
+**Algorithms:**
+- Sliding window (30-60 sec)
+- Node merging (inode deduplication)
+- Edge weight = causality confidence
+
+
+### 3. **AI Models**
+
+**Purpose:** Detect attack patterns + predict impact
+
+#### GNN (Graph Neural Network)
+- **Input:** Dependency graph
+- **Task:** Anomaly detection (classify edges as normal/attack)
+- **Model:** GraphSAGE-T (28 layers, 2M params)
+- **Target ROC-AUC:** ≥ 0.90
+
+#### LSTM (Long Short-Term Memory)
+- **Input:** Event sequences (last 100 events per file)
+- **Task:** Encrypt/ransomware pattern prediction
+- **Model:** Bidirectional LSTM (256 hidden, 2 layers)
+- **Target F1:** ≥ 0.95
+
+
+### 4. **MCTS Planner**
+
+**Purpose:** Generate ranked undo candidates
+
+**Input:** Graph + anomaly scores + predictions
+**Output:** Undo plan (file reversions, process kills)
+
+**Algorithm:**
+- Monte Carlo Tree Search (500-1000 simulations)
+- Reward function: restoration gain - side effects
+- Timeout: 5 min max planning
+
+
+### 5. **Undo Sandbox**
+
+**Purpose:** Deterministic replay & safety validation
+
+**Technology:** Firecracker microVMs
+
+**Workflow:**
+1. Clone victim pod root filesystem
+2. Apply undo operations (reverse writes, file deletion)
+3. Run deterministic replay (same syscalls, same data)
+4. Validate: md5sum matches pre-attack version
+5. Approve if all checks pass
+
+---
+
+## Threat Model: LockBit-Style Ransomware
+
+### Attack Phases
+
+```
+Time:    T+0     T+10s   T+30s   T+60s    T+120s
+         ├────────┼────────┼────────┼────────┤
+Phase:   │ Recon  │ Spread │Encrypt │ Ransom │
+         │        │        │        │  Note  │
+         └────────┴────────┴────────┴────────┘
+
+Events:
+- T+0-10s: Process enumeration (openat /proc/*)
+- T+10-30s: Lateral movement (TCP connections)
+- T+30-80s: File encryption loop:
+    * openat("/app/file_N.dat", O_RDONLY)
+    * write("/tmp/buffer", encrypted_data)
+    * rename("/app/file_N.dat", "/app/file_N.lockbit3")
+    * repeat 1000+ times
+- T+80-120s: Ransom note (write "README_LOCKBIT.txt")
+```
+
+### Detection Indicators
+
+| Phase       | Indicator                             | Confidence |
+| ----------- | ------------------------------------- | ---------- |
+| **Recon**   | Burst of `/proc` reads                | Medium     |
+| **Spread**  | Unexpected TCP connections (SMB 445)  | High       |
+| **Encrypt** | High write-to-rename ratio (>0.8)     | Very High  |
+|             | Extension pattern (.lockbit, .locked) | Very High  |
+|             | File size shrinkage (partial encrypt) | High       |
+| **Ransom**  | Predictable filename (README_*)       | Medium     |
+
+
+
+## Data Schema
+
+### Event Record
+
+```json
+{
+    "timestamp": "2025-01-15T10:30:45.123456789Z",  // Wall-clock time
+    "pid": 1234,                                      // Process ID
+    "tid": 1235,                                      // Thread ID
+    "comm": "python3",                                // Executable name
+    "syscall": "rename",                              // openat|write|rename
+    "path": "/app/uploads/data.dat",                  // Source
+    "new_path": "/app/uploads/data.dat.lockbit3",     // Destination (rename)
+    "ret_val": 0,                                     // Return value
+    "bytes": 1048576,                                 // Bytes written (write only)
+    "flags": "O_WRONLY|O_CREAT"                       // File flags (openat only)
+}
+```
+
+### Temporal Graph Node
+
+```json
+{
+    "id": "inode:2097152:ts_5000",                    // Unique ID
+    "type": "file",                                   // file|process|socket
+    "inode": 2097152,                                 // VFS inode
+    "path": "/app/uploads/data.dat",                  // File path
+    "first_seen": "2025-01-15T10:30:44Z",             // Event window start
+    "last_seen": "2025-01-15T10:30:46Z",              // Event window end
+    "read_count": 1,                                  // Aggregated metrics
+    "write_count": 100,
+    "rename_count": 1,
+    "anomaly_score": 0.92,                            // GNN output [0, 1]
+    "tags": ["encrypted", "renamed", "suspicious"]    // Detector output
+}
+```
+
+---
+
+
+## Deployment Topology
+
+### Single-Cluster Setup (MVP)
+
+```
+┌────────────────────────────────────┐
+│  Kubernetes Cluster (kind/minikube) │
+├────────────────────────────────────┤
+│                                    │
+│ ┌──────────────────────────────┐   │
+│ │ Node-1 (control-plane)      │   │
+│ │ ├─ tracker DaemonSet Pod    │   │
+│ │ ├─ graph-constructor Pod    │   │
+│ │ ├─ ai-models Pod            │   │
+│ │ ├─ planner Pod              │   │
+│ │ └─ sandbox Pod              │   │
+│ └──────────────────────────────┘   │
+│                                    │
+│ ┌──────────────────────────────┐   │
+│ │ Node-2 (worker)             │   │
+│ │ ├─ tracker Daemon
+│ │    (ransomware target)      │   │
+│ └──────────────────────────────┘   │
+└────────────────────────────────────┘
+```
+
+### Multi-Cluster (Future)
+
+```
+Cluster-A (prod)  ───┐
+                      ├──→ Central AI (SaaS)
+Cluster-B (staging) ─┘
+```
+
+---
+
+## Related Work & References
+
+- **Runtime Monitoring:** SystemTap, DTrace (OS-level)
+- **eBPF Frameworks:** Falco, Tetragon, Cilium (production-grade)
+- **Ransomware Detection:** CryptoLock detection papers, AES patterns
+- **Undo Computing:** "Reversible VM Execution" (VMware)
+- **MCTS:** AlphaGo tree search, Monte Carlo planning
+
+---
+
+## Next Steps
+
+- Read [Tracker Overview](./tracker/overview) for component deep-dive
+- Follow [Quick Start](./tracker/quick-start) to run locally
+- Explore [Implementation Guide](./tracker/implementation) for kernel details
+- See [Contributing](../contributing) to extend the system

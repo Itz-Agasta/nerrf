@@ -1,39 +1,36 @@
----
-name: Pull Request
-about: Propose changes to the codebase
-title: ""
-labels: ""
-assignees: ""
----
-
 ## Description
 
-Please provide a clear and concise description of the changes in this pull request. What problem does it solve? What new functionality does it add?
+<!-- Please include a summary of the change and which issue is fixed. Please also include relevant motivation and context. List any dependencies that are required for this change. -->
 
 ## Type of Change
 
-- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📚 Documentation update
-- [ ] 🔧 Refactoring (no functional changes)
-- [ ] 🧪 Tests (adding or updating tests)
-- [ ] 🔒 Security (security-related changes)
-- [ ] 🚀 Performance (performance-related changes)
+<!--
+Please delete options that are not relevant. -->
+
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] Refactoring (no functional changes)
+- [ ] Tests (adding or updating tests)
+- [ ] Security (security-related changes)
+- [ ] Performance (performance-related changes)
 
 ## Changes Made
 
 ### Files Modified
 
-- List the main files changed and what was modified in each
+<!-- List the main files changed and what was modified in each -->
 
 ### Key Changes
 
-- Bullet points describing the most important changes
+<!-- Bullet points describing the most important changes -->
 
 ## Testing
 
 ### Test Coverage
+
+<!-- Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce. Please also list any relevant details for your test configuration -->
 
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
@@ -42,11 +39,11 @@ Please provide a clear and concise description of the changes in this pull reque
 
 ### Test Results
 
-- Describe test results or provide links to CI runs
+<!-- Describe test results or provide links to CI runs -->
 
 ## Screenshots/Demos
 
-If applicable, add screenshots or demos showing the changes in action.
+<!-- If applicable, add screenshots or demos showing the changes in action. -->
 
 ## Checklist
 
@@ -66,7 +63,7 @@ If applicable, add screenshots or demos showing the changes in action.
 
 ## Additional Notes
 
-Any additional information or context about this pull request.
+<!--Any additional information or context about this pull request.-->
 
 ## Security Considerations
 
@@ -82,12 +79,11 @@ Any additional information or context about this pull request.
 
 ## Breaking Changes
 
-If this PR introduces breaking changes, please describe:
+<!--If this PR introduces breaking changes, please describe:
 
 - What breaks and why
 - Migration path for users
-- Timeline for deprecation (if applicable)
+- Timeline for deprecation (if applicable)-->
 
----
 
-Thank you for contributing to NERRF! 🎯
+<!--Thank you for contributing to NERRF! 🎯-->
