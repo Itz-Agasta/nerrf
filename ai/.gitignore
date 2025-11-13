@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch models and checkpoints
+*.pth
+*.pt
+checkpoints/
+
+# Data files
+*.db
+*.log
+data/
+
+# Jupyter notebooks (dev only)
+*.ipynb
+
+# Test files
+test_*.py
+*_test.py
+demo_*.py

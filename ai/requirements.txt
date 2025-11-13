@@ -1,0 +1,16 @@
+# NERRF AI Requirements - M2 AI Spike
+# Core PyTorch ecosystem for deep learning
+torch>=2.0.0
+torch-geometric>=2.3.0
+torch-scatter>=2.1.0
+torch-sparse>=0.6.0
+
+# Data processing
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Database connectivity  
+rocksdb>=0.8.0
+
+# Graph processing
+networkx>=3.0
