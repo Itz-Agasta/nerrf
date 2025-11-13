@@ -7,12 +7,13 @@
 package pb
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -349,7 +350,7 @@ const file_trace_proto_rawDesc = "" +
 	"\x06events\x18\x01 \x03(\v2\x12.nerrf.trace.EventR\x06events\"\a\n" +
 	"\x05Empty2H\n" +
 	"\aTracker\x12=\n" +
-	"\fStreamEvents\x12\x12.nerrf.trace.Empty\x1a\x17.nerrf.trace.EventBatch0\x01B/Z-github.com/Itz-Agasta/neerf/tracker/pkg/pb;pbb\x06proto3"
+	"\fStreamEvents\x12\x12.nerrf.trace.Empty\x1a\x17.nerrf.trace.EventBatch0\x01B/Z-github.com/Itz-Agasta/nerrf/tracker/pkg/pb;pbb\x06proto3"
 
 var (
 	file_trace_proto_rawDescOnce sync.Once

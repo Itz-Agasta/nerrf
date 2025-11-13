@@ -5,7 +5,7 @@ description: Real-time eBPF-based system call tracing for ransomware detection
 
 ## Overview
 
-The **NEERF Tracker** is a high-performance, kernel-space eBPF instrumentation layer that captures fine-grained file system operations in real-time. It forms the sensory foundation of the NEERF framework, streaming structured syscall events via gRPC to AI models for attack detection and recovery planning.
+The **NERRF Tracker** is a high-performance, kernel-space eBPF instrumentation layer that captures fine-grained file system operations in real-time. It forms the sensory foundation of the NERRF framework, streaming structured syscall events via gRPC to AI models for attack detection and recovery planning.
 
 ### Key Capabilities
 
@@ -56,11 +56,11 @@ The **NEERF Tracker** is a high-performance, kernel-space eBPF instrumentation l
 
 ### Supported Syscalls
 
-| Syscall       | ID | Purpose                              | Captured Fields         |
-| ------------- | -- | ------------------------------------ | ----------------------- |
-| `openat()`    | 1  | File open/create operations          | path, flags, mode       |
-| `write()`     | 2  | File write operations (LockBit key)  | fd, bytes, offset       |
-| `rename()`    | 3  | File rename/move (LockBit indicator) | old path, new path      |
+| Syscall    | ID  | Purpose                              | Captured Fields    |
+| ---------- | --- | ------------------------------------ | ------------------ |
+| `openat()` | 1   | File open/create operations          | path, flags, mode  |
+| `write()`  | 2   | File write operations (LockBit key)  | fd, bytes, offset  |
+| `rename()` | 3   | File rename/move (LockBit indicator) | old path, new path |
 
 **Future Extensions:**
 - `unlink()` – File deletion patterns
@@ -73,13 +73,13 @@ The **NEERF Tracker** is a high-performance, kernel-space eBPF instrumentation l
 
 ### Why eBPF?
 
-| Aspect            | eBPF                        | Alternatives             |
-| ----------------- | --------------------------- | ------------------------ |
-| **Kernel-space**  | Programs run in kernel      | strace, auditd (slower)  |
-| **Zero-copy**     | Ring buffers (mmap'd)       | perf events (copying)    |
-| **Safety**        | Kernel verifier             | Kernel modules (unsafe)  |
-| **Performance**   | JIT-compiled, fast path     | userspace hooks (slow)   |
-| **Compatibility** | Kernel 4.18+, no recompile  | systemtap (setup-heavy)  |
+| Aspect            | eBPF                       | Alternatives            |
+| ----------------- | -------------------------- | ----------------------- |
+| **Kernel-space**  | Programs run in kernel     | strace, auditd (slower) |
+| **Zero-copy**     | Ring buffers (mmap'd)      | perf events (copying)   |
+| **Safety**        | Kernel verifier            | Kernel modules (unsafe) |
+| **Performance**   | JIT-compiled, fast path    | userspace hooks (slow)  |
+| **Compatibility** | Kernel 4.18+, no recompile | systemtap (setup-heavy) |
 
 ### Ring Buffer vs. Perf Events
 
@@ -187,13 +187,13 @@ service Tracker {
 
 **Environment:** 4-core cloud VM, 8 GB RAM, Ubuntu 22.04
 
-| Metric                  | Result      | Target   | Status |
-| ----------------------- | ----------- | -------- | ------ |
-| **Peak throughput**     | 1,250 evt/s | ≥1k evt/s |      |
-| **P99 latency**         | 240 µs      | &lt;1 ms    |      |
-| **CPU overhead**        | 3.8%        | &lt;5%      |      |
-| **Memory footprint**    | 12 MB       | &lt;50 MB   |      |
-| **Sustained (10 min)**  | 1,100 evt/s | ≥1k evt/s |      |
+| Metric                 | Result      | Target    | Status |
+| ---------------------- | ----------- | --------- | ------ |
+| **Peak throughput**    | 1,250 evt/s | ≥1k evt/s |        |
+| **P99 latency**        | 240 µs      | &lt;1 ms  |        |
+| **CPU overhead**       | 3.8%        | &lt;5%    |        |
+| **Memory footprint**   | 12 MB       | &lt;50 MB |        |
+| **Sustained (10 min)** | 1,100 evt/s | ≥1k evt/s |        |
 
 ### Scalability Notes
 

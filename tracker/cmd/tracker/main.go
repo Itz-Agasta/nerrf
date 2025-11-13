@@ -1,6 +1,6 @@
-// Package main implements the NEERF Tracker - M1 Milestone
+// Package main implements the NERRF Tracker - M1 Milestone
 //
-// The NEERF Tracker is an eBPF-based system call tracer that captures file operations
+// The NERRF Tracker is an eBPF-based system call tracer that captures file operations
 // (openat, write, rename) from the Linux kernel and streams them via gRPC to AI models
 // for ransomware detection and recovery planning.
 //
@@ -10,7 +10,7 @@
 //   - gRPC streaming server for real-time event distribution
 //   - Protobuf-based event schema for structured data
 //
-// This is part of the Neural Execution Reversal & Recovery Framework (NEERF)
+// This is part of the Neural Execution Reversal & Recovery Framework (NERRF)
 // designed to enable AI-driven "undo computing" for post-ransomware recovery.
 //
 // Author: Itz-Agasta
@@ -29,13 +29,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	pb "github.com/Itz-Agasta/neerf/tracker/pkg/pb"
+	"github.com/Itz-Agasta/nerrf/tracker/pkg/bpf"
+	pb "github.com/Itz-Agasta/nerrf/tracker/pkg/pb"
 	"github.com/cilium/ebpf/ringbuf"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"github.com/Itz-Agasta/neerf/tracker/pkg/bpf"
-	"golang.org/x/sys/unix"
 )
 
 // getenvDefault returns the value of environment variable k, or v if not set.
@@ -47,7 +47,7 @@ func getenvDefault(k, v string) string {
 	return v
 }
 
-// main initializes and runs the NEERF Tracker service.
+// main initializes and runs the NERRF Tracker service.
 //
 // Startup sequence:
 //  1. Locate and validate eBPF object file (tracepoints.o)
@@ -59,7 +59,8 @@ func getenvDefault(k, v string) string {
 //  7. Wait for shutdown signal and cleanup gracefully
 //
 // Environment Variables:
-//   TRACKER_LISTEN_ADDR - gRPC server address (default: 127.0.0.1:50051)
+//
+//	TRACKER_LISTEN_ADDR - gRPC server address (default: 127.0.0.1:50051)
 //
 // Requirements:
 //   - Root privileges for eBPF operations
@@ -73,7 +74,7 @@ func main() {
 	}
 	execDir := filepath.Dir(execPath)
 	objPath := filepath.Join(execDir, "../bpf/tracepoints.o")
-	
+
 	// Validate BPF object exists
 	if _, err := os.Stat(objPath); os.IsNotExist(err) {
 		log.Fatalf("BPF object not found: %s", objPath)
@@ -119,7 +120,7 @@ func main() {
 		rd:      rd,
 		clients: make(map[chan *pb.EventBatch]struct{}),
 	}
-	
+
 	// Calculate boot time for accurate event timestamps
 	// eBPF uses CLOCK_MONOTONIC, we need to convert to wall clock time
 	var ts unix.Timespec
@@ -128,12 +129,12 @@ func main() {
 	}
 	monoNs := ts.Sec*1000000000 + ts.Nsec
 	serv.bootTime = time.Now().Add(-time.Duration(monoNs) * time.Nanosecond)
-	
+
 	// Register gRPC service and enable reflection for debugging
 	pb.RegisterTrackerServer(s, serv)
 	reflection.Register(s)
 	log.Printf("Tracker listening on %s", addr)
-	
+
 	// Start background goroutines
 	go serv.broadcastEvents() // Process events from ring buffer
 	go func() {
@@ -222,17 +223,17 @@ func (s *server) broadcastEvents() {
 			log.Printf("ringbuf read error: %v", err)
 			return
 		}
-		
+
 		// Parse the raw eBPF event data
 		var e event
 		if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &e); err != nil {
 			log.Printf("binary read error: %v", err)
 			continue
 		}
-		
+
 		// Convert monotonic timestamp to wall clock time
 		eventTime := s.bootTime.Add(time.Duration(e.Ts) * time.Nanosecond)
-		
+
 		// Create protobuf event with all available fields
 		pbEvent := &pb.Event{
 			Ts:      timestamppb.New(eventTime),
@@ -245,11 +246,11 @@ func (s *server) broadcastEvents() {
 			RetVal:  e.RetVal,
 			Bytes:   e.Bytes,
 			// TODO: Add flags, inode, mode, uid, gid in future iterations
-			Flags:   pb.Event_O_RDONLY, // Default for now
+			Flags: pb.Event_O_RDONLY, // Default for now
 		}
-		
+
 		batch := &pb.EventBatch{Events: []*pb.Event{pbEvent}}
-		
+
 		// Broadcast to all connected clients
 		s.mu.Lock()
 		for ch := range s.clients {
@@ -269,33 +270,35 @@ func (s *server) broadcastEvents() {
 // This must match exactly with the struct defined in tracepoints.c
 //
 // Fields:
-//   Ts: Kernel timestamp (CLOCK_MONOTONIC nanoseconds)
-//   Pid/Tid: Process and thread identifiers
-//   Comm: Executable name (truncated to 16 chars by kernel)
-//   SyscallId: Our custom syscall identifier (1=openat, 2=write, 3=rename)
-//   RetVal: System call return value (file descriptor or error)
-//   Bytes: Number of bytes for write operations
-//   Path: File path for openat/rename (up to 256 chars)
-//   NewPath: Destination path for rename operations
+//
+//	Ts: Kernel timestamp (CLOCK_MONOTONIC nanoseconds)
+//	Pid/Tid: Process and thread identifiers
+//	Comm: Executable name (truncated to 16 chars by kernel)
+//	SyscallId: Our custom syscall identifier (1=openat, 2=write, 3=rename)
+//	RetVal: System call return value (file descriptor or error)
+//	Bytes: Number of bytes for write operations
+//	Path: File path for openat/rename (up to 256 chars)
+//	NewPath: Destination path for rename operations
 type event struct {
-	Ts         uint64
-	Pid        uint32
-	Tid        uint32
-	Comm       [16]byte
-	SyscallId  uint32
-	RetVal     int64
-	Bytes      uint64
-	Path       [256]byte
-	NewPath    [256]byte
+	Ts        uint64
+	Pid       uint32
+	Tid       uint32
+	Comm      [16]byte
+	SyscallId uint32
+	RetVal    int64
+	Bytes     uint64
+	Path      [256]byte
+	NewPath   [256]byte
 }
 
 // syscallName converts our custom syscall IDs to human-readable names.
 // These IDs are defined in tracepoints.c and must match exactly.
 //
 // Mapping:
-//   1 -> "openat"  (file open/create operations)
-//   2 -> "write"   (file write operations - key for LockBit detection)  
-//   3 -> "rename"  (file rename/move operations - LockBit adds .lockbit extension)
+//
+//	1 -> "openat"  (file open/create operations)
+//	2 -> "write"   (file write operations - key for LockBit detection)
+//	3 -> "rename"  (file rename/move operations - LockBit adds .lockbit extension)
 //
 // Future: Could extend to include unlink, chmod, etc. for more comprehensive tracking
 func syscallName(id uint32) string {

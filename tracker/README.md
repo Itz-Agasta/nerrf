@@ -10,7 +10,7 @@ tracker/
 ├── Dockerfile.minimal     # single-stage, no kernel headers needed
 ├── scripts/
 │   └── install-deps.sh    # One-liner for dev deps
-├── go.mod                 # module github.com/Itz-Agasta/neerf/tracker
+├── go.mod                 # module github.com/Itz-Agasta/nerrf/tracker
 ├── Makefile               # `make run` → builds + starts server
 └── README.md              # quick-start for contributors
 ```
